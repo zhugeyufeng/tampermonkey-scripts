@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         SIAM章节PDF批量下载-章节名命名-延时下载
+// @name         SIAM章节PDF批量下载-章节名命名-延时下载+aria2c批量命令
 // @namespace    http://tampermonkey.net/
-// @version      0.5
-// @description  批量下载PDF并自动用章节名命名，支持延时间隔（epubs-siam-org.ezp1.lib.umn.edu）
-// @author       ChatGPT
+// @version      1.0
+// @description  批量下载PDF并自动用章节名命名，支持延时间隔+导出aria2c脚本（epubs-siam-org.ezp1.lib.umn.edu）
+// @author       yorfir
 // @match        *://epubs-siam-org.ezp1.lib.umn.edu/*
 // @grant        none
 // ==/UserScript==
@@ -134,9 +134,10 @@
         dlBtn.textContent = '下载中...';
         for (let i = 0; i < chapterPdfPairs.length; i++) {
             let pair = chapterPdfPairs[i];
+            let num = String(i+1).padStart(2,'0');
             let a = document.createElement('a');
             a.href = pair.url;
-            a.download = safeFileName(pair.title) + '.pdf';
+            a.download = num + '_' + safeFileName(pair.title) + '.pdf';
             a.style.display = 'none';
             document.body.appendChild(a);
             a.click();
@@ -162,7 +163,10 @@
     copyBtn.onmouseout = () => copyBtn.style.background = '#12b886';
 
     copyBtn.onclick = () => {
-        let allText = chapterPdfPairs.map(x=>`${x.title}\n${x.url}`).join('\n\n');
+        let allText = chapterPdfPairs.map((x,i)=>{
+            let num = String(i+1).padStart(2,'0');
+            return `${num}_${safeFileName(x.title)}.pdf\n${x.url}`;
+        }).join('\n\n');
         if (navigator.clipboard) {
             navigator.clipboard.writeText(allText).then(() => {
                 copyBtn.textContent = '已复制!';
@@ -176,6 +180,38 @@
     };
     btnBox.appendChild(copyBtn);
 
+    // 增加导出 aria2c 脚本按钮
+    let aria2Btn = document.createElement('button');
+    aria2Btn.textContent = '导出 aria2c 批量脚本';
+    aria2Btn.style.background = '#ff9500';
+    aria2Btn.style.color = '#fff';
+    aria2Btn.style.border = 'none';
+    aria2Btn.style.borderRadius = '5px';
+    aria2Btn.style.padding = '6px 18px';
+    aria2Btn.style.fontWeight = 'bold';
+    aria2Btn.style.cursor = 'pointer';
+    aria2Btn.onmouseover = () => aria2Btn.style.background = '#d97d00';
+    aria2Btn.onmouseout = () => aria2Btn.style.background = '#ff9500';
+
+    aria2Btn.onclick = () => {
+        let aria2cmds = chapterPdfPairs.map((x, i) => {
+            let num = String(i+1).padStart(2, '0');
+            let fname = `${num}_${safeFileName(x.title)}.pdf`;
+            return `aria2c -c -s 16 -x 16 -o "${fname}" "${x.url}"`;
+        }).join('\n');
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(aria2cmds).then(() => {
+                aria2Btn.textContent = '已复制!';
+                setTimeout(()=>aria2Btn.textContent='导出 aria2c 批量脚本', 1200);
+            }, () => {
+                window.prompt('复制失败，请手动复制：', aria2cmds);
+            });
+        } else {
+            window.prompt('请手动复制aria2c批量命令：', aria2cmds);
+        }
+    };
+    btnBox.appendChild(aria2Btn);
+
     container.appendChild(btnBox);
 
     // 展示列表
@@ -185,7 +221,8 @@
         item.style.borderBottom = '1px solid #ececec';
 
         let titleSpan = document.createElement('span');
-        titleSpan.textContent = pair.title;
+        let num = String(i+1).padStart(2,'0');
+        titleSpan.textContent = num + '_' + pair.title;
         titleSpan.style.fontWeight = 'bold';
         titleSpan.style.marginRight = '10px';
         item.appendChild(titleSpan);
